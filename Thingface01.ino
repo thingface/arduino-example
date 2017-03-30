@@ -15,8 +15,8 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-#define DEVICE_ID "83785b2afa664877"
-#define SECRET_KEY "H3YBhON2Y29hU5iNU4MjzHGd2coXgt"
+#define DEVICE_ID ""
+#define SECRET_KEY ""
 
 const char* sensorTopicPrefix = "d/d/"DEVICE_ID"/";
 
