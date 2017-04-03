@@ -22,6 +22,7 @@
 void callback(char* topic, byte* payload, unsigned int length);
 //
 //
+float getTemperature();
 void sendSensorValue(char* sensorId, float sensorValue);
 char strContains(char *str, char *sfind);
 

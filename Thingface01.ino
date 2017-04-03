@@ -1,28 +1,82 @@
-#include <DHT.h>
-// 1. install libraries
-// PubSubClient
-// ArduinoJson
-// 2. Set MQTT_MAX_PACKET_SIZE in PubSubClient.h to 200
-// 3. create account at http://thingface.io
-// 4. register your device and get ID and secret key
+/********************************************************************/
+// Arduino Internet of Things
+// - control/monitor arduino over internet
+// - example for home automation system
 
-// optional
-// for DHT11 
-// install "Adafruit Unified Sensor"
-// install "DHT sensor library"
+/********************************************************************/
+// INSTALL
+// - UIPEthernet for ENC28J60
+// - OneWire, DallasTemperature for DS18B20 temperature sensor
+// - DHT sensor library for DHT sensor
+// - PubSubClient
+// - ArduinoJson
+
+/********************************************************************/
+// WIRE UP
+//
+//	ENC28J60 - Arduino
+//	----------------------
+//	SS			- 10
+//	MOSI(SI)	- 11
+//	MISO (SO)	- 12
+//	SCK			- 13
+//	----------------------
+//
+//	DS18B20 - Arduino
+//	----------------------
+//	1.pin - +5V
+//	2.pin - 2
+//	3.pin - GND
+//
+//	DHT11 - Arduino
+//	----------------------
+//	1.pin - 2
+//  2.pin - +5V
+//	3.pin - GND
+
+/********************************************************************/
+// SETUP
+// 
+// 1. Set MQTT_MAX_PACKET_SIZE in PubSubClient.h to 200
+// 2. create account at http://thingface.io/account/new
+// 3. register your device and get ID and secret key
+
+
+// uncomment for UIP Ethernet module
+//#define UIP 1
+// uncomment for DHT11
+#define DHT11 1
+// uncomment for LM35
+//#define LM35 1
+// uncomment for DS18B20
+//#define DS 1
+
+#ifdef UIP
+#include <UIPEthernet.h>
+#else
 #include <SPI.h>
 #include <Ethernet.h>
+#endif
+
+#ifdef DHT11
+#include <DHT.h>
+#endif
+
+#ifdef DS
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#endif
+
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-#define DEVICE_ID ""
-#define SECRET_KEY ""
+#define DEVICE_ID "83785b2afa664877"
+#define SECRET_KEY "H3YBhON2Y29hU5iNU4MjzHGd2coXgt"
+#define ONE_WIRE_BUS 2
 
 const char* sensorTopicPrefix = "d/d/"DEVICE_ID"/";
 
-bool ledState1;
-bool ledState2;
-DHT dht(2, DHT11);
+bool ledState;
 // interval for sending sensor values
 unsigned long previousMillis = 0;
 const long interval = 6000; // must be >=5 seconds
@@ -32,8 +86,21 @@ byte mac[] = {
 };
 
 //52.174.88.226 dev-app.thingface.io
-IPAddress server(52, 174, 88, 226);
+IPAddress serverIp(52, 174, 88, 226);
 EthernetClient ethClient;
+
+#ifdef LM35
+int adcValue = 0;
+#endif
+
+#ifdef DHT11
+DHT dht(2, DHT11);
+#endif // DHT11
+
+#ifdef DS
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+#endif // DS
 
 void callback(char* topic, byte* payload, unsigned int length)
 {
@@ -55,14 +122,9 @@ void callback(char* topic, byte* payload, unsigned int length)
 			byte ledPin = commandPayload["a"][0];
 			if (ledPin == 9)
 			{
-				ledState1 = !ledState1;
-				digitalWrite(ledPin, ledState1 ? HIGH : LOW);
-			}
-			if (ledPin == 6)
-			{
-				ledState2 = !ledState2;
-				digitalWrite(ledPin, ledState2 ? HIGH : LOW);
-			}
+				ledState = !ledState;
+				digitalWrite(ledPin, ledState ? HIGH : LOW);
+			}			
 		}
 		
 		//clear
@@ -74,15 +136,20 @@ void callback(char* topic, byte* payload, unsigned int length)
 	}
 }
 
-PubSubClient client(server, 1883, callback, ethClient);
+PubSubClient client(serverIp, 1883, callback, ethClient);
 
 void setup()
 {
 	/* LEDs */
 	pinMode(9, OUTPUT);
-	pinMode(6, OUTPUT);
-
+	
+#ifdef DHT11
 	dht.begin();
+#endif
+
+#ifdef DS
+	sensors.begin();
+#endif // DS
 
 	/* ethernet */
 	Ethernet.begin(mac);
@@ -107,11 +174,28 @@ void loop()
 	{		
 		previousMillis = currentMillis;
 
-		float t = dht.readTemperature();
+		float t = getTemperature();
 		sendSensorValue("temp", t);
-
-		//sendSensorValue("temp1", 10.45);
 	}
+}
+
+float getTemperature()
+{
+
+	#ifdef DHT11
+	return dht.readTemperature();
+	#endif // DHT11
+
+	#ifdef LM35
+	adcValue = analogRead(A0);
+	// (ADC * AREF / 10mV) / 1024
+	return ((adcValue * 5000.0) / 10.0) / 1024;
+	#endif // LM35
+
+	#ifdef DS
+	sensors.requestTemperatures();
+	return sensors.getTempCByIndex(0);
+	#endif // DS
 }
 
 void sendSensorValue(char* sensorId, float sensorValue)
