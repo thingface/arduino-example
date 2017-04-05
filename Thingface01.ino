@@ -85,8 +85,8 @@ byte mac[] = {
 	0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 };
 
-//52.174.88.226 dev-app.thingface.io
-IPAddress serverIp(52, 174, 88, 226);
+//52.166.58.29 dev-app.thingface.io
+IPAddress serverIp(52, 166, 58, 29);
 EthernetClient ethClient;
 
 #ifdef LM35
